@@ -1,18 +1,56 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
-import * as SplashScreen from 'expo-splash-screen';
-import { useColorScheme } from 'react-native';
+import { Stack, useRouter, useSegments } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import { useEffect, type ReactNode } from 'react';
 
-import { AnimatedSplashOverlay } from '@/components/animated-icon';
-import AppTabs from '@/components/app-tabs';
+import { AuthProvider, useAuth } from '@/lib/auth';
+import { colors } from '@/theme';
 
-SplashScreen.preventAutoHideAsync();
+/**
+ * Keeps signed-out users on the login screen and signed-in users inside the
+ * tab group that belongs to their role.
+ */
+function RouteGuard({ children }: { children: ReactNode }) {
+  const { ready, user } = useAuth();
+  const segments = useSegments();
+  const router = useRouter();
 
-export default function TabLayout() {
-  const colorScheme = useColorScheme();
+  useEffect(() => {
+    if (!ready) return;
+
+    const onLogin = segments[0] === 'login';
+
+    if (!user && !onLogin) {
+      router.replace('/login');
+      return;
+    }
+
+    if (user && onLogin) {
+      router.replace(user.role === 'proctor' ? '/proctor' : '/student');
+    }
+  }, [ready, user, segments, router]);
+
+  return <>{children}</>;
+}
+
+export default function RootLayout() {
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <AnimatedSplashOverlay />
-      <AppTabs />
-    </ThemeProvider>
+    <AuthProvider>
+      <RouteGuard>
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            contentStyle: { backgroundColor: colors.page },
+          }}>
+          <Stack.Screen name="index" />
+          <Stack.Screen name="login" />
+          <Stack.Screen name="student" />
+          <Stack.Screen name="proctor" />
+          <Stack.Screen name="exam/[id]" />
+          <Stack.Screen name="examination/[id]" />
+          <Stack.Screen name="create-examination" />
+        </Stack>
+      </RouteGuard>
+      <StatusBar style="light" />
+    </AuthProvider>
   );
 }
